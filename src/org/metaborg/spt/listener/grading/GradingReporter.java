@@ -29,6 +29,7 @@ public class GradingReporter implements ITestReporter{
 		if (suites.containsKey(testsuiteFile)) {
 			TestSuite suite = suites.get(testsuiteFile);
 			suite.addTest(new TestCase(description));
+			//System.out.println("Added testcase " + description + " to testsuite " + testsuiteFile);
 		} else {
 			throw new IllegalArgumentException("This test suite is unknown.");
 		}
@@ -46,6 +47,7 @@ public class GradingReporter implements ITestReporter{
 			throw new IllegalArgumentException("This test suite exists already.");
 		}
 		suites.put(filename, new TestSuite(name, filename));
+		//System.out.println("Added testsuite " + filename);
 	}
 
 	@Override
@@ -57,6 +59,7 @@ public class GradingReporter implements ITestReporter{
 			if (test == null) {
 				throw new IllegalArgumentException("No such test case found.");
 			} else {
+				//System.out.println("Starting testcase " + description + "of testsuite " + testsuiteFile);
 				test.start();
 			}
 		} else {
@@ -73,6 +76,7 @@ public class GradingReporter implements ITestReporter{
 			if (test == null) {
 				throw new IllegalArgumentException("No such test case found.");
 			} else {
+				//System.out.println("Finishing testcase " + description + "of testsuite " + testsuiteFile);
 				test.finish(succeeded, messages);
 				checkDone();
 			}
@@ -83,11 +87,16 @@ public class GradingReporter implements ITestReporter{
 
 	// check if all test cases are finished, if so do the reporting
 	private void checkDone() {
+		//System.out.println("Checking if all testsuites are done.");
 		for (TestSuite suite : suites.values()) {
+			//System.out.println("Checking if testsuite " + suite.getFileName() + " is done");
 			for (TestCase test : suite.getTests()) {
+				//System.out.println("Checking if testcase " + test.getName() + " of testsuite " + suite.getFileName() + " is done");
 				if (!test.isFinished()) {
+					//System.out.println("testcase " + test.getName() + " of testsuite " + suite.getFileName() + " is NOT done");
 					return;
 				}
+				//System.out.println("testcase " + test.getName() + " of testsuite " + suite.getFileName() + " is done");
 			}
 		}
 		// all registered tests are done
@@ -102,12 +111,18 @@ public class GradingReporter implements ITestReporter{
 	 * and finally the suite filename itself is considered a category.
 	 */
 	private void report() {
+		//System.out.println("Reporting the results of the testrun");
 		Map<String, Folder> folders = new HashMap<>();
 		Path common = getCommonPath();
+		//System.out.println("Common path of testsuites is: " + common.toString());
 		for (TestSuite suite : suites.values()) {
+			//System.out.println("Reporting results for testsuite " + suite.getFileName());
 			Path suitePath = FileSystems.getDefault().getPath(suite.getFileName());
+			//System.out.println("The path of this testsuite is " + suitePath.toString());
 			Path relative = common.relativize(suitePath);
+			//System.out.println("Relative path for testsuite " + suite.getFileName() + " is " + relative.toString());
 			Folder folder = null;
+			// make a Folder entry for each folder in the relative path
 			for (int i = 0; i < relative.getNameCount() - 1; i++) {
 				String name = relative.getName(i).toString();
 				if (folder == null) {
@@ -129,15 +144,16 @@ public class GradingReporter implements ITestReporter{
 				}
 			}
 			// if there is no nested folder structure for this test suite, make it artificially
+			// happens if all testsuites are in the same folder
 			if (folder == null) {
 				String folderName = "Automatic Feedback";
 				folder = folders.get(folderName);
 				folder = folder == null ? new Folder(folderName) : folder;
 				folders.put(folder.getName(), folder);
 			}
+			// make a Category for this testsuite
 			Category category = new Category(FilenameUtils.removeExtension(relative.getFileName().toString()));
 			for (TestCase test : suite.getTests()) {
-				// FIXME make the points configurable
 				boolean success = false;
 				// a pass of a single test case of multiple same named test cases is enough to make the test case pass
 				for (Run run : test.getRuns()) {
@@ -145,6 +161,7 @@ public class GradingReporter implements ITestReporter{
 						success = true;
 					}
 				}
+				// FIXME make the points configurable (now each test is worth 1 point)
 				category.addReport(new RunReport(test.getName(), 1, success));
 			}
 			folder.addChild(category);
@@ -153,6 +170,7 @@ public class GradingReporter implements ITestReporter{
 		try {
 			// FIXME make configurable
 			File out = common.resolve("output.txt").toFile();
+			//System.out.println("Printing to file: " + out.getAbsolutePath());
 			FileWriter writer = new FileWriter(out);
 			for (Folder f : folders.values()) {
 				writer.write(f.toMarkDown());
@@ -172,6 +190,8 @@ public class GradingReporter implements ITestReporter{
 			Path suitePath = fs.getPath(suite.getFileName());
 			if (common == null) {
 				common = suitePath.subpath(0, suitePath.getNameCount() - 1);
+				// subpath returns a relative Path, but the common path must be absolute
+				common = suitePath.getRoot().resolve(common);
 			} else {
 				Path temp = suitePath.getRoot();
 				for (int i = 0; i < Math.min(suitePath.getNameCount(), common.getNameCount()); i++) {
